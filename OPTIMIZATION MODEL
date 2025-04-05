@@ -1,0 +1,50 @@
+!pip install "numpy<2.0"
+!pip install --upgrade pandas bottleneck
+
+!pip install pulp
+!pip install pandas
+import pulp
+import pandas as pd
+model = pulp.LpProblem("Supply_Chain_Optimization", pulp.LpMinimize)
+warehouses = ['W1', 'W2', 'W3']
+customers = ['C1', 'C2', 'C3']
+supply = {
+    'W1': 500,
+    'W2': 600,
+    'W3': 800
+}
+
+demand = {
+    'C1': 400,
+    'C2': 500,
+    'C3': 600
+}
+
+costs = {
+    ('W1', 'C1'): 2, ('W1', 'C2'): 3, ('W1', 'C3'): 1,
+    ('W2', 'C1'): 5, ('W2', 'C2'): 4, ('W2', 'C3'): 3,
+    ('W3', 'C1'): 3, ('W3', 'C2'): 2, ('W3', 'C3'): 4
+}
+
+x = pulp.LpVariable.dicts("Ship", costs.keys(), lowBound=0, cat='Continuous')
+
+model += pulp.lpSum(x[w, c] * costs[w, c] for w, c in costs), "Total_Transportation_Cost"
+
+for w in warehouses:
+    model += pulp.lpSum(x[w, c] for c in customers) <= supply[w], f"Supply_Constraint_{w}"
+
+for c in customers:
+    model += pulp.lpSum(x[w, c] for w in warehouses) >= demand[c], f"Demand_Constraint_{c}"
+
+model.solve()
+
+print("Optimization Status:", pulp.LpStatus[model.status])
+print("Total Cost:", pulp.value(model.objective))
+
+data = []
+for (w, c) in costs:
+    quantity = x[w, c].varValue
+    data.append([w, c, quantity])
+
+df_result = pd.DataFrame(data, columns=["Warehouse", "Customer", "Units Shipped"])
+print(df_result)
